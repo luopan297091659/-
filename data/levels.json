@@ -12,13 +12,13 @@
     { "groups": 8, "types": 7 },
     { "groups": 9, "types": 8 },
     { "groups": 9, "types": 8 },
-    { "groups": 10, "types": 9 },
-    { "groups": 10, "types": 9 },
-    { "groups": 11, "types": 10 },
-    { "groups": 11, "types": 10 },
-    { "groups": 12, "types": 11 },
-    { "groups": 12, "types": 11 },
-    { "groups": 13, "types": 11 },
-    { "groups": 13, "types": 11 }
+    { "groups": 10, "types": 8 },
+    { "groups": 10, "types": 8 },
+    { "groups": 11, "types": 8 },
+    { "groups": 11, "types": 8 },
+    { "groups": 12, "types": 8 },
+    { "groups": 12, "types": 8 },
+    { "groups": 13, "types": 8 },
+    { "groups": 13, "types": 8 }
   ]
 }

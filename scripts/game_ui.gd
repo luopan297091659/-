@@ -1,42 +1,36 @@
 extends Control
 
-enum GameState { PLAYING, WON, LOST, PAUSED }
+enum GameState { PLAYING, MATCHING, WON, LOST, PAUSED }
 
 const SAVE_PATH := "user://progress.cfg"
 const LEVELS_PATH := "res://data/levels.json"
 const SLOT_LIMIT := 7
 const PRODUCT_NAMES := [
 	"鮭おにぎり",
-	"ツナマヨ",
-	"カレー弁当",
-	"唐揚げ弁当",
-	"ジュース",
+	"ツナごはん",
+	"カレー",
+	"オレンジ",
 	"牛乳",
-	"緑茶",
-	"ミネラル水",
-	"ケーキ",
-	"どら焼き",
-	"プリン",
+	"お菓子",
+	"バナナ",
+	"コーラ",
 ]
 const PRODUCT_TEXTURES := [
 	preload("res://assets/items/onigiri/item_onigiri_salmon.png"),
 	preload("res://assets/items/onigiri/item_onigiri_tuna.png"),
 	preload("res://assets/items/bento/item_bento_curry.png"),
-	preload("res://assets/items/bento/item_bento_karaage.png"),
 	preload("res://assets/items/drinks/item_drink_juice.png"),
 	preload("res://assets/items/drinks/item_drink_milk.png"),
 	preload("res://assets/items/drinks/item_drink_tea.png"),
-	preload("res://assets/items/drinks/item_drink_water.png"),
 	preload("res://assets/items/sweets/item_cake.png"),
 	preload("res://assets/items/sweets/item_dorayaki.png"),
-	preload("res://assets/items/sweets/item_pudding.png"),
 ]
+const GAME_BACKGROUND: Texture2D = preload("res://assets/ui/backgrounds/bg_game.png")
 const SLOT_TEXTURE: Texture2D = preload("res://assets/ui/panels/inventory_slot.png")
 const HINT_TEXTURE: Texture2D = preload("res://assets/ui/icons/icon_hint.png")
 const UNDO_TEXTURE: Texture2D = preload("res://assets/ui/icons/icon_undo.png")
 const SHUFFLE_TEXTURE: Texture2D = preload("res://assets/ui/icons/icon_shuffle.png")
 const STAR_TEXTURE: Texture2D = preload("res://assets/ui/icons/icon_star.png")
-const COIN_TEXTURE: Texture2D = preload("res://assets/ui/icons/icon_coin.png")
 const NEXT_TEXTURE: Texture2D = preload("res://assets/ui/buttons/btn_next.png")
 const RETRY_TEXTURE: Texture2D = preload("res://assets/ui/buttons/btn_retry.png")
 const TEXT_COLOR := Color("#65452f")
@@ -135,14 +129,16 @@ func _save_progress() -> void:
 
 
 func _build_interface() -> void:
-	var background := ColorRect.new()
-	background.color = Color("#fff3db")
+	var background := TextureRect.new()
+	background.texture = GAME_BACKGROUND
+	background.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	background.stretch_mode = TextureRect.STRETCH_SCALE
 	background.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	background.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(background)
 
 	var top_bar := HBoxContainer.new()
-	_set_anchors(top_bar, 0.06, 0.055, 0.94, 0.18)
+	_set_anchors(top_bar, 0.06, 0.055, 0.94, 0.155)
 	top_bar.add_theme_constant_override("separation", 14)
 	add_child(top_bar)
 
@@ -154,7 +150,9 @@ func _build_interface() -> void:
 	top_bar.add_child(level_label)
 
 	var coin_icon := PanelContainer.new()
-	coin_icon.custom_minimum_size = Vector2(48, 48)
+	coin_icon.custom_minimum_size = Vector2(56, 56)
+	coin_icon.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	coin_icon.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	var coin_style := StyleBoxFlat.new()
 	coin_style.bg_color = Color("#ffb83d")
 	coin_style.border_color = Color("#b17a48")
@@ -163,22 +161,26 @@ func _build_interface() -> void:
 	coin_icon.add_theme_stylebox_override("panel", coin_style)
 	top_bar.add_child(coin_icon)
 
-	var coin_mark := TextureRect.new()
-	coin_mark.texture = COIN_TEXTURE
-	coin_mark.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-	coin_mark.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
-	coin_mark.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var coin_mark := Label.new()
+	coin_mark.text = "¥"
+	coin_mark.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	coin_mark.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	coin_mark.add_theme_font_size_override("font_size", 23)
+	coin_mark.add_theme_color_override("font_color", TEXT_COLOR)
 	coin_icon.add_child(coin_mark)
 
 	coin_label = Label.new()
 	coin_label.add_theme_font_size_override("font_size", 25)
 	coin_label.add_theme_color_override("font_color", TEXT_COLOR)
 	coin_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	coin_label.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	top_bar.add_child(coin_label)
 
 	var pause_button := Button.new()
 	pause_button.text = "Ⅱ"
 	pause_button.custom_minimum_size = Vector2(72, 72)
+	pause_button.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	pause_button.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	pause_button.add_theme_font_size_override("font_size", 30)
 	pause_button.add_theme_color_override("font_color", TEXT_COLOR)
 	_style_button(pause_button, Color("#fff0cc"))
@@ -312,9 +314,17 @@ func _start_level(level_number: int) -> void:
 	var config: Dictionary = levels[current_level - 1]
 	var random := RandomNumberGenerator.new()
 	random.seed = current_level * 1009 + 1
+	var groups: int = int(config["groups"])
+	var types: int = int(config["types"])
+	var group_types: Array[int] = []
+	for product_type in range(types):
+		group_types.append(product_type)
+	while group_types.size() < groups:
+		group_types.append(random.randi_range(0, types - 1))
+	_shuffle_with_rng(group_types, random)
+
 	var product_pool: Array[int] = []
-	for _group_index in range(int(config["groups"])):
-		var product_type := random.randi_range(0, int(config["types"]) - 1)
+	for product_type in group_types:
 		for _copy in range(3):
 			product_pool.append(product_type)
 	_shuffle_with_rng(product_pool, random)
@@ -355,6 +365,8 @@ func _refresh_interface() -> void:
 func _render_board() -> void:
 	for child in shelf_grid.get_children():
 		child.queue_free()
+	if board.is_empty():
+		return
 
 	var column_count := 4
 	if board.size() >= 30:
@@ -362,25 +374,55 @@ func _render_board() -> void:
 	elif board.size() >= 20:
 		column_count = 5
 	shelf_grid.columns = column_count
+	var row_count := int(ceil(float(board.size()) / column_count))
+	var cell_width := floori((612.0 - (column_count - 1) * 8) / column_count)
+	var cell_height := floori((620.0 - (row_count - 1) * 6) / row_count)
+	var icon_height := maxi(42, cell_height - 25)
 
 	for item in board:
-		if bool(item["cleared"]):
-			var empty_space := Control.new()
-			empty_space.custom_minimum_size = Vector2(94, 86)
-			shelf_grid.add_child(empty_space)
-			continue
-
 		var item_id: int = int(item["id"])
 		var product_type: int = int(item["type"])
+		var card := PanelContainer.new()
+		card.custom_minimum_size = Vector2(cell_width, cell_height)
+		var card_style := StyleBoxFlat.new()
+		card_style.bg_color = Color("#fff6e6")
+		card_style.border_color = Color("#b17a48")
+		card_style.set_border_width_all(2)
+		card_style.set_corner_radius_all(12)
+		card_style.content_margin_left = 3
+		card_style.content_margin_right = 3
+		card_style.content_margin_top = 3
+		card_style.content_margin_bottom = 3
+		card.add_theme_stylebox_override("panel", card_style)
+		shelf_grid.add_child(card)
+
+		var card_content := VBoxContainer.new()
+		card_content.add_theme_constant_override("separation", 0)
+		card.add_child(card_content)
+
+		if bool(item["cleared"]):
+			card.modulate = Color(1, 1, 1, 0.18)
+			card_content.add_child(Control.new())
+			continue
+
 		var product_button := TextureButton.new()
 		product_button.texture_normal = PRODUCT_TEXTURES[product_type]
 		product_button.ignore_texture_size = true
 		product_button.stretch_mode = TextureButton.STRETCH_KEEP_ASPECT_CENTERED
-		product_button.custom_minimum_size = Vector2(94, 86)
+		product_button.custom_minimum_size = Vector2(cell_width - 8, icon_height)
 		product_button.tooltip_text = PRODUCT_NAMES[product_type]
-		product_button.modulate = Color("#fff0a8") if item_id == hint_item_id else Color.WHITE
+		if item_id == hint_item_id:
+			product_button.modulate = Color("#fff0a8")
 		product_button.pressed.connect(_select_item.bind(item_id))
-		shelf_grid.add_child(product_button)
+		card_content.add_child(product_button)
+
+		var item_label := Label.new()
+		item_label.text = PRODUCT_NAMES[product_type]
+		item_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		item_label.clip_text = true
+		item_label.add_theme_font_size_override("font_size", 12)
+		item_label.add_theme_color_override("font_color", TEXT_COLOR)
+		card_content.add_child(item_label)
 
 
 func _render_tray() -> void:
@@ -466,10 +508,26 @@ func _select_item(item_id: int) -> void:
 	for index in range(tray.size()):
 		if tray[index] == product_type:
 			matching_slots.append(index)
-	if matching_slots.size() == 3:
+	var matched := matching_slots.size() == 3
+	if matched:
+		game_state = GameState.MATCHING
+		message_label.text = "%sが3つそろった！" % PRODUCT_NAMES[product_type]
+		_refresh_interface()
+		await get_tree().process_frame
+		if not is_inside_tree():
+			return
+		for slot_index in matching_slots:
+			var matched_slot := tray_row.get_child(slot_index) as Control
+			matched_slot.pivot_offset = matched_slot.size / 2
+			var tween := matched_slot.create_tween()
+			tween.tween_property(matched_slot, "scale", Vector2(1.14, 1.14), 0.1)
+			tween.tween_property(matched_slot, "scale", Vector2.ONE, 0.12)
+		await get_tree().create_timer(0.23).timeout
+		if not is_inside_tree():
+			return
 		for index in range(matching_slots.size() - 1, -1, -1):
 			tray.remove_at(matching_slots[index])
-		message_label.text = "%sが3つそろった！" % PRODUCT_NAMES[product_type]
+		game_state = GameState.PLAYING
 	else:
 		message_label.text = "%sをトレーに入れたよ" % PRODUCT_NAMES[product_type]
 
