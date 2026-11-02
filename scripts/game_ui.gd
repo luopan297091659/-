@@ -25,7 +25,7 @@ const PRODUCT_TEXTURES := [
 	preload("res://assets/items/sweets/item_cake.png"),
 	preload("res://assets/items/sweets/item_dorayaki.png"),
 ]
-const GAME_BACKGROUND: Texture2D = preload("res://assets/ui/backgrounds/bg_game.png")
+const GAME_BACKGROUND: Texture2D = preload("res://assets/ui/backgrounds/bg_game_clean.png")
 const SLOT_TEXTURE: Texture2D = preload("res://assets/ui/panels/inventory_slot.png")
 const HINT_TEXTURE: Texture2D = preload("res://assets/ui/icons/icon_hint.png")
 const UNDO_TEXTURE: Texture2D = preload("res://assets/ui/icons/icon_undo.png")
